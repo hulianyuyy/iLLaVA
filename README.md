@@ -67,7 +67,7 @@ HF_ENDPOINT=https://hf-mirror.com huggingface-cli download --resume-download lmm
 
 Replace the `/path_to_your_checkpoint` with the path to your downloaded LLaVA-OneVision pretrained weights. Set the `your_benchmark` as your target benchmark, which can be selected from [supported tasks](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/current_tasks.md) of lmms-eval.
 
-If you are difficult to visit `https://huggingface.co/` (e.g., in *China*), place `HF_ENDPOINT=https://hf-mirror.com` in the begining of your command.
+If you are difficult to visit `https://huggingface.co/` (e.g., in *China*), place `HF_ENDPOINT=https://hf-mirror.com` in the beginning of your command.
 
 The log files are saved in `./logs`.
 
