@@ -9,22 +9,22 @@ _**iLLaVA** is an efficient method for large vision language models by merging v
 
 <div align=center>
 <img width="800" src="./figs/framework.png"/>
-<h4>The framework of iLLaVA</h4>
+<h4> Fig.1: The framework of iLLaVA</h4>
 </div>
 
 <div align=center>
 <img width="800" src="./figs/effectiveness.png"/>
-<h4> The efficiency of iLLaVA </h4>
+<h4> Fig.2: The efficiency of iLLaVA </h4>
 </div>
 
 <div align=center>
 <img width="800" src="./figs/generalizability.jpg"/>
-<h4> The generalizability of iLLaVA </h4>
+<h4> Fig.3: The generalizability of iLLaVA </h4>
 </div>
 
 <div align=center>
 <img width="800" src="./figs/visualization.png"/>
-<h4> The visualization of iLLaVA </h4>
+<h4> Fig.4: The visualization of iLLaVA </h4>
 </div>
 
 *Scheduled Updates🔥*
@@ -65,11 +65,11 @@ HF_ENDPOINT=https://hf-mirror.com huggingface-cli download --resume-download lmm
 ### Video benchmarks
 `lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,max_frames_num=32,enable_illava_vit=True,illava_vit_k=3-4-5-6,itllava_vit_r=92,enable_illava_llm=True,illava_llm_k=2,illava_llm_r=0.70 --task your_benchmark  --batch_size 1 --log_samples --log_samples_suffix llava_onevision_7b --output_path ./log`
 
-Replace the `/path_to_your_checkpoint` with the path to your downloaded LLaVA-OneVision pretrained weights. Set the `task` as your target benchmark, which can be selected from [supported tasks](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/current_tasks.md) of lmms-eval.
+Replace the `/path_to_your_checkpoint` with the path to your downloaded LLaVA-OneVision pretrained weights. Set the `your_benchmark` as your target benchmark, which can be selected from [supported tasks](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/current_tasks.md) of lmms-eval.
 
 If you are difficult to visit `https://huggingface.co/` (e.g., in *China*), place `HF_ENDPOINT=https://hf-mirror.com` in the begining of your command.
 
-The log files are saved in `./logs`
+The log files are saved in `./logs`.
 
 ## ✨Visualization: the token merging process
 
@@ -80,7 +80,7 @@ The log files are saved in `./logs`
 
 We here set a more aggressive merging procedure for video benchmarks to show better visualization results. You may modify the hyper-parameters by yourself.
 
-Token merging visualizations for different layers would be stored with a prefix of `attention_map_vit_layer_{remained_token_num}` and attention_map_llm_layer_{remained_token_num}` for vit stages and llm stages in the current dir.
+Token merging visualizations for different layers would be stored with a prefix of `attention_map_vit_layer_{remained_token_num}.jpg` and `attention_map_llm_layer_{remained_token_num}.jpg` for vit stages and llm stages in the current dir.
 
 ## 🎫Model hyper-parameters
 Besides the original paramters of LLaVA-Onevision, we introduce several new paramters:
