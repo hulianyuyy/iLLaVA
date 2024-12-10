@@ -8,7 +8,7 @@
 _**iLLaVA** is an efficient method for large vision language models by merging visual tokens. It could achieve about **2×** throughput and **1.7× - 2×** memory reduction with comparable performance through merging redundant visual tokens in some certain layers._
 
 <div align=center>
-<img width="600" src="./figs/framework.png"/>
+<img width="800" src="./figs/framework.png"/>
 <h4>The framework of iLLaVA</h4>
 </div>
 
@@ -34,7 +34,7 @@ _**iLLaVA** is an efficient method for large vision language models by merging v
 2. - [x] Visualizations
 3. - [x] Supporting both image and video benchmarks
 
-## Setup
+## 🧨Setup
 ```bash
 conda create -n illava python=3.10
 conda activate illava
@@ -43,10 +43,10 @@ bash setup.sh
 
 *Notice that you should install `numpy=1.x` instead of `numpy=2.x`
 
-## Inference
+## 🎈Inference
 This repo provides the inference code for iLLaVA based on [LLaVA-OneVision](https://github.com/LLaVA-VL/LLaVA-NeXT/blob/main/docs/LLaVA_OneVision.md). 
 
-1. You should manually download the pretrained weight for LLaVA-OneVision (e.g., LLaVA-OneVision 7B) from [here](https://huggingface.co/lmms-lab/llava-onevision-qwen2-7b-ov), or conducting the following command to download it
+1. You should manually download the pretrained weight for LLaVA-OneVision (e.g., LLaVA-OneVision 7B) from [here](https://huggingface.co/lmms-lab/llava-onevision-qwen2-7b-ov), or conducting the following command to download it:
 
 ```
 pip install -U huggingface_hub
@@ -71,7 +71,7 @@ If you are difficult to visit `https://huggingface.co/` (e.g., in *China*), plac
 
 The log files are saved in `./logs`
 
-## Visualization: the token merging process
+## ✨Visualization: the token merging process
 
 ### Single-image benchmarks and Multi-image benchmarks
 `lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,enable_illava_vit=True,illava_vit_k=5-6-7-8,illava_vit_r=92,illava_track_vit_source=True,enable_illava_llm=True,illava_llm_k=8,illava_llm_r=0.70,illava_track_llm_source=True --task your_benchmark --batch_size 1 --log_samples     --log_samples_suffix llava_onevision_7b --output_path ./logs`
@@ -82,7 +82,7 @@ We here set a more aggressive merging procedure for video benchmarks to show bet
 
 Token merging visualizations for different layers would be stored with a prefix of `attention_map_vit_layer_{remained_token_num}` and attention_map_llm_layer_{remained_token_num}` for vit stages and llm stages in the current dir.
 
-## Model hyper-parameters
+## 🎫Model hyper-parameters
 Besides the original paramters of LLaVA-Onevision, we introduce several new paramters:
 
 - `enable_illava_vit[bool]`, whether enables using iLLaVA in the ViT stage. `Default: False`.
@@ -97,7 +97,7 @@ Besides the original paramters of LLaVA-Onevision, we introduce several new para
 
 You can set the corresponding parameters in the `model_args` of the command like we provide in the `inference` section.
 
-## Model inplementation 
+## 🛒Model inplementation 
 
 We mainly modify the following files to conduct different functions:
 - [llava_qwen_training_free.py](./src/LLaVA-OneVision/llava/model/language_model/llava_qwen_training_free.py), which preprocess the inputs before feeding into the LVLM.
