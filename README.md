@@ -5,11 +5,11 @@
 <img alt="Static Badge" src="https://img.shields.io/badge/arXiv-2412.06263-red"></a>
 
 
-*iLLaVA is a efficient method for large vision language models by merging visual tokens. It could achieve about 2× throughput and 1.7× - 2× memory reduction with comparable performance through merging redundant visual tokens in some certain layers.*
+* **iLLaVA** is a efficient method for large vision language models by merging visual tokens. It could achieve about **2×** throughput and **1.7× - 2×** memory reduction with comparable performance through merging redundant visual tokens in some certain layers.*
 
 <div align=center>
 <img width="600" src="./figs/framework.png"/>
-The framework of iLLaVA
+<h4>The framework of iLLaVA</h4>
 </div>
 
 <div align=center>
