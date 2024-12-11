@@ -504,6 +504,7 @@ class Llava_OneVision_Training_Free(lmms):
                             raw_frames.append(frames)
                             frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().cuda()
                             image_tensor.append(frames)
+                            #raw_frames.append((frames*127+128).permute(0,2,3,1).int().cpu())
                         except Exception as e:
                             eval_logger.error(f"Error {e} in loading video")
                             image_tensor = None

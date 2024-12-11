@@ -1069,7 +1069,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
                             h_img, w_img =  source_indice_from_image[-1]
                             # Calculate the input num_frames
                             num_frames = len(source_indice_from_image)-1
-                            assert image_token_length % num_frames == 0
+                            # assert image_token_length % num_frames == 0
                             # Calculate the image tokens for each frame after vit and projection stage
                             image_token_per_frame = image_token_length // num_frames
                             existing_cur_index = torch.zeros(image_token_length).bool()
@@ -1085,7 +1085,11 @@ class Qwen2Model(Qwen2PreTrainedModel):
                             for i in range(num_frames):
                                 # Get the indice for selected patches in the current image
                                 # Warning: This is not equalling the Spatial_pool function in the model. As that is conducting upon the features, while this is conducting upon the indices. It's recommended to set the mm_spatial_pool_stride=1 for visualization
-                                source_indice_cur_image = source_indice_from_image[i].flatten()[existing_cur_index[image_token_per_frame*i:image_token_per_frame*(i+1)].tolist()]
+                                # Warning: due to the existence of image_newline parameter of LLaVA-Onevision in llava_qwen_training_free.py, the visualization for images may not be spatially precisely aligned with the inputs. But for videos, the visualizaion is correct.
+                                # source_indice_cur_image = source_indice_from_image[i].flatten()[existing_cur_index[image_token_per_frame*i:image_token_per_frame*(i+1)].tolist()]
+                                # The number of kept tokens for each frames in the vit stage
+                                keep_tokens = len(source_indice_from_image[i].flatten())
+                                source_indice_cur_image = source_indice_from_image[i].flatten()[existing_cur_index[image_token_per_frame*i:image_token_per_frame*(i+1)][:keep_tokens].tolist()]
                                 mask = torch.zeros((h_img, w_img)).flatten()
                                 mask[source_indice_cur_image.tolist()] = 1.0
                                 mask = torch.nn.functional.interpolate(mask.view(1, 1, h_img, w_img), size=(h_img*8, w_img*8), mode="nearest").squeeze().unsqueeze(-1).numpy()

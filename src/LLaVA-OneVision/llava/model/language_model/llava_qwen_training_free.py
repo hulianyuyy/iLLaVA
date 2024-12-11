@@ -312,8 +312,8 @@ class LlavaQwenTrainingFreeForCausalLM(Qwen2ForCausalLM, LlavaMetaForCausalLM):
                             # image_feature =  torch.cat((image_feature, self.model.image_newline[:, None, None].expand(*image_feature.shape[:-1], 1).to(image_feature.device)), dim=-1)
                             # image_feature = image_feature.permute(1, 2, 0).contiguous()
                             image_feature = image_feature.flatten(0, 1)
+                            image_token_length = image_feature.shape[0]
                             image_feature = torch.cat((image_feature, self.model.image_newline[None].to(image_feature.device)), dim=0)
-                        image_token_length = image_feature.shape[0]
                     elif image_feature.shape[0] > 1:  # multi patches and multi images operations
                         # rank0_print("Single-images")  # list with len of num_images, each of size [2, 3, 384, 384]
                         base_image_feature = image_feature[0]
@@ -378,14 +378,15 @@ class LlavaQwenTrainingFreeForCausalLM(Qwen2ForCausalLM, LlavaMetaForCausalLM):
                             pass
                         else:
                             image_feature = torch.cat((base_image_feature, image_feature), dim=0)
+                        image_token_length = image_feature.shape[0]
                         # print(f"image_feature after unpad and concat : {image_feature.shape}")  # [2333, 3584]
                     else:  # single image operations
                         image_feature = image_feature[0]
+                        image_token_length = image_feature.shape[0]
                         if "unpad" in mm_patch_merge_type:
                             image_feature = torch.cat((image_feature, self.model.image_newline[None]), dim=0)
 
                     new_image_features.append(image_feature)
-                    image_token_length = image_feature.shape[0]
                 image_features = new_image_features
             else:
                 raise ValueError(f"Unexpected mm_patch_merge_type: {self.config.mm_patch_merge_type}")
