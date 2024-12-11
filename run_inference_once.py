@@ -222,7 +222,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", help="Directory to the image file, video file or path to multi-images.", required=True)
     parser.add_argument("--model_path", type=str, help="Directory to the pretrained weights of models.", required=True)
-    parser.add_argument("--question", type=str, help="The input question accompanied with the image/video.", required=True)
+    parser.add_argument("--question", type=str, help="The input question accompanied with the image/video.", required=True, default='describe_the_input')
     parser.add_argument("--max_frames_num", type=int, default=32)
     parser.add_argument("--video_decode_backend", type=str, default='decord')
     parser.add_argument("--mm_spatial_pool_stride", type=int, default=2)
