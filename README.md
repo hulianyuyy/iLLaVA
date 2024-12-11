@@ -82,6 +82,32 @@ We here set a more aggressive merging procedure for video benchmarks to show bet
 
 Token merging visualizations for different layers would be stored with a prefix of `attention_map_vit_layer_{remained_token_num}.jpg` and `attention_map_llm_layer_{remained_token_num}.jpg` for vit stages and llm stages in the current dir.
 
+*Note that the visualization for images may not be fully spatially aligned, due to the existence of `image_newline` parameter of LLaVA-Onevision.*
+
+## 🍕Inference on one single input
+We provide a `run_inference_one_video.py` to help users use iLLaVA by specifying inputs. The acceptable inputs include a single image, multiple images or a video. 
+
+The parameters you need to specify in the command incldue:
+- `model_path`, which indicates the path to the pretrained model
+- `input_path`, which could be the path to an image file, the directory of multiple images or the path to a video file.
+- `question`, which is the question proposed by the user. The different words should be separated by `-`. For example, the input is `describe_the_input`.
+
+Other parameters may refer to the `run_inference_one_video.py`.
+### Example: inputting a single image
+`python run_inference_one_video.py --model_path /path_to_your_checkpoint --enable_illava_vit True --illava_vit_k 5-6-7-8 --illava_vit_r 92  --enable_illava_llm True --illava_llm_k 8 --illava_llm_r 0.70  --question describe_the_input --input_path /path_to_your_image/xxx.jpg`
+
+### Example: inputting multiple images
+`python run_inference_one_video.py --model_path /path_to_your_checkpoint --enable_illava_vit True --illava_vit_k 5-6-7-8 --illava_vit_r 92  --enable_illava_llm True --illava_llm_k 8 --illava_llm_r 0.70  --question describe_the_input --input_path /path_to_your_images`
+
+### Example: inputting a video
+`python run_inference_one_video.py --model_path /path_to_your_checkpoint --enable_illava_vit True --illava_vit_k 3-4-5-6 --illava_vit_r 92  --enable_illava_llm True --illava_llm_k 2 --illava_llm_r 0.70  --question describe_the_input --input_path /path_to_your_video/xxx.mp4`
+
+You could set `--max_frames_num 32` to set different input frames.
+### Visualization
+You could add `--illava_track_vit_source True --illava_track_llm_source True` in the command to enable visualization. 
+
+For videos, we recommend using `mm_spatial_pool_stride=1` and larger merging steps to enable better visualization. For example:
+`python run_inference_one_video.py --model_path /path_to_your_checkpoint --enable_illava_vit True --illava_vit_k 2-3-4-5-6-7-8 --illava_vit_r 80  --enable_illava_llm True --illava_llm_k 2 --illava_llm_r 0.50  --question describe_the_input --input_path /path_to_your_video/xxx.mp4  --mm_spatial_pool_stride 1`
 ## 🎫Model hyper-parameters
 Besides the original paramters of LLaVA-Onevision, we introduce several new paramters:
 
