@@ -109,6 +109,18 @@ You could add `--illava_track_vit_source True --illava_track_llm_source True` in
 For videos, we recommend using `mm_spatial_pool_stride=1` and larger merging steps to enable better visualization. 
 
 `python run_inference_once.py --enable_illava_vit True --illava_vit_k 2-3-4-5-6-7-8 --illava_vit_r 80  --enable_illava_llm True --illava_llm_k 2 --illava_llm_r 0.50 --model_path /path_to_your_checkpoint --question describe_the_input --mm_spatial_pool_stride 1  --input_path /path_to_your_video/xxx.mp4 `
+
+## 🎄Demo 
+We provide a offline demo to help users deploy iLLaVA on their local machines. It supports inputting a single image, multiple images or a video, and the get the outputs from iLLaVA. The command is shown as follows:
+`python demo.py --enable_illava_vit True --illava_vit_k 5-6-7-8 --illava_vit_r 92  --enable_illava_llm True --illava_llm_k 8 --illava_llm_r 0.70 --model_path /path_to_your_checkpoint` 
+
+Below is the visualization for our demo.
+
+<div align=center>
+<img width="800" src="./figs/demo.jpg"/>
+<h4> Fig.5: The visualization of our demo </h4>
+</div>
+
 ## 🎫Model hyper-parameters
 Besides the original paramters of LLaVA-Onevision, we introduce several new paramters:
 
