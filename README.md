@@ -106,6 +106,10 @@ You could set `--max_frames_num 32` to set different input frames.
 ### Visualization
 You could add `--illava_track_vit_source True --illava_track_llm_source True` in the command to enable visualization. 
 
+For an image/images, we recommend using the following command:
+
+`python run_inference_once.py --enable_illava_vit True --illava_vit_k 2-3-4-5-6-7-8 --illava_vit_r 80  --enable_illava_llm True --illava_llm_k 8 --illava_llm_r 0.50 --model_path /path_to_your_checkpoint --question describe_the_input  --input_path /path_to_your_image.jpg `
+
 For videos, we recommend using `mm_spatial_pool_stride=1` and larger merging steps to enable better visualization. 
 
 `python run_inference_once.py --enable_illava_vit True --illava_vit_k 2-3-4-5-6-7-8 --illava_vit_r 80  --enable_illava_llm True --illava_llm_k 2 --illava_llm_r 0.50 --model_path /path_to_your_checkpoint --question describe_the_input --mm_spatial_pool_stride 1  --input_path /path_to_your_video/xxx.mp4 `
