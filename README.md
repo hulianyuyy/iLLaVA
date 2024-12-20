@@ -63,7 +63,7 @@ HF_ENDPOINT=https://hf-mirror.com huggingface-cli download --resume-download lmm
 ### Single-image benchmarks and Multi-image benchmarks
 `lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,enable_illava_vit=True,illava_vit_k=5-6-7-8,illava_vit_r=92,enable_illava_llm=True,illava_llm_k=8,illava_llm_r=0.70 --task your_benchmark --batch_size 1 --log_samples --log_samples_suffix llava_onevision_7b --output_path ./logs`
 ### Video benchmarks
-`lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,max_frames_num=32,enable_illava_vit=True,illava_vit_k=3-4-5-6,itllava_vit_r=92,enable_illava_llm=True,illava_llm_k=2,illava_llm_r=0.70 --task your_benchmark  --batch_size 1 --log_samples --log_samples_suffix llava_onevision_7b --output_path ./log`
+`lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,max_frames_num=32,enable_illava_vit=True,illava_vit_k=3-4-5-6,illava_vit_r=92,enable_illava_llm=True,illava_llm_k=2,illava_llm_r=0.70 --task your_benchmark  --batch_size 1 --log_samples --log_samples_suffix llava_onevision_7b --output_path ./log`
 
 Replace the `/path_to_your_checkpoint` with the path to your downloaded LLaVA-OneVision pretrained weights. Set the `your_benchmark` as your target benchmark, which can be selected from [supported tasks](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/current_tasks.md) of lmms-eval.
 
@@ -76,7 +76,7 @@ The log files are saved in `./logs`.
 ### Single-image benchmarks and Multi-image benchmarks
 `lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,enable_illava_vit=True,illava_vit_k=5-6-7-8,illava_vit_r=92,illava_track_vit_source=True,enable_illava_llm=True,illava_llm_k=8,illava_llm_r=0.70,illava_track_llm_source=True --task your_benchmark --batch_size 1 --log_samples     --log_samples_suffix llava_onevision_7b --output_path ./logs`
 ### Video benchmarks
-`lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,max_frames_num=32,enable_illava_vit=True,illava_vit_k=2-3-4-5-6-7-8,itllava_vit_r=80,illava_track_vit_source=True,enable_illava_llm=True,illava_llm_k=2,illava_llm_r=0.50,illava_track_llm_source=True,mm_spatial_pool_stride=1     --task your_benchmark --batch_size 1 --log_samples --log_samples_suffix llava_onevision_7b --output_path ./log`
+`lmms-eval --model llava_onevision_training_free --model_args pretrained=/path_to_your_checkpoint,conv_template=qwen_1_5,model_name=llava_qwen_training_free,device_map=auto,max_frames_num=32,enable_illava_vit=True,illava_vit_k=2-3-4-5-6-7-8,illava_vit_r=80,illava_track_vit_source=True,enable_illava_llm=True,illava_llm_k=2,illava_llm_r=0.50,illava_track_llm_source=True,mm_spatial_pool_stride=1     --task your_benchmark --batch_size 1 --log_samples --log_samples_suffix llava_onevision_7b --output_path ./log`
 
 We here set a more aggressive merging procedure for video benchmarks to show better visualization results. You may modify the hyper-parameters by yourself.
 
