@@ -474,9 +474,6 @@ class Qwen2VLVisionBlock(nn.Module):
                             reduce_tokens_current = (reduce_tokens_current//4)*4
                         else:
                             reduce_tokens_current = 0
-                # print(f"attn_weights_mean:{attn_weights_mean.shape}")
-                # print(f"reduce_tokens_current:{reduce_tokens_current}")
-                # print(f"hidden_states:{hidden_states.shape}")
                 if attn_weights_mean.ndim==2:
                     attn_weights_mean = attn_weights_mean.mean(0) # eliminate the batch dimension
                 indice = attn_weights_mean.topk(reduce_tokens_current+1, largest=False)[1] # eliminate the heads and get topk
