@@ -206,8 +206,8 @@ We mainly modify the following files to conduct different functions:
 - [llava_onevision_training_free.py](./src/lmms_eval-0.2.4/lmms_eval/models/llava_onevision_training_free.py), which defines the model `llava_onevision_training_free` of model initialization and generation process.
 ### For Qwen2-VL
 We mainly modify the following files to conduct different functions:
-- [model.py](.src/VLMEvalKit/vlmeval/vlm/qwen2_vl/model.py), which defines the Qwen2 model and builds prompts.
-- [modeling_qwen2_vl.py](.src/transformers-4.46.0/src/transformers/models/qwen2_vl/modeling_qwen2_vl.py), which implements the forward pass of image encoder and LLM.
+- [model.py](./src/VLMEvalKit/vlmeval/vlm/qwen2_vl/model.py), which defines the Qwen2 model and builds prompts.
+- [modeling_qwen2_vl.py](./src/transformers-4.46.0/src/transformers/models/qwen2_vl/modeling_qwen2_vl.py), which implements the forward pass of image encoder and LLM.
 ## 🎁Acknowledgements
 
 Thanks to [FastV](https://github.com/pkunlp-icler/FastV), [FreeVideoLLM](https://github.com/contrastive/FreeVideoLLM) for their open-source code.
