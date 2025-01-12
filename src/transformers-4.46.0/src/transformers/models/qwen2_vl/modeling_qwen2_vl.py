@@ -28,7 +28,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch.nn import CrossEntropyLoss, LayerNorm
-import matplotlib.pyplot as plt
 from ...activations import ACT2FN
 from ...cache_utils import Cache, SlidingWindowCache, StaticCache
 from ...generation import GenerationMixin
@@ -475,7 +474,12 @@ class Qwen2VLVisionBlock(nn.Module):
                             reduce_tokens_current = (reduce_tokens_current//4)*4
                         else:
                             reduce_tokens_current = 0
-                indice = attn_weights_mean.mean(0).topk(reduce_tokens_current+1, largest=False)[1] # eliminate the heads and get topk
+                # print(f"attn_weights_mean:{attn_weights_mean.shape}")
+                # print(f"reduce_tokens_current:{reduce_tokens_current}")
+                # print(f"hidden_states:{hidden_states.shape}")
+                if attn_weights_mean.ndim==2:
+                    attn_weights_mean = attn_weights_mean.mean(0) # eliminate the batch dimension
+                indice = attn_weights_mean.topk(reduce_tokens_current+1, largest=False)[1] # eliminate the heads and get topk
                 # set the starting index of i_th image
                 start_index = cu_seqlens[i] 
                 indice = indice + start_index
