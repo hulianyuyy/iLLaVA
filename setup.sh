@@ -6,5 +6,6 @@ cd ../transformers-4.46.0
 pip install -e .
 cd ../VLMEvalKit
 pip install -e .
+pip install qwen-vl-utils[decord]
 pip install datasets seaborn pycocoevalcap
 
