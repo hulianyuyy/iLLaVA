@@ -28,7 +28,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch.nn import CrossEntropyLoss, LayerNorm
-
+import matplotlib.pyplot as plt
 from ...activations import ACT2FN
 from ...cache_utils import Cache, SlidingWindowCache, StaticCache
 from ...generation import GenerationMixin
@@ -55,7 +55,7 @@ from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
 
-    from ...modeling_flash_attention_utils import _flash_attention_forward
+    from ...modeling_flash_attention_utils import _flash_attention_forward, _flash_attention_forward_illava
 else:
     flash_attn_varlen_func = None
 
@@ -365,20 +365,27 @@ class VisionFlashAttention2(nn.Module):
         self.proj = nn.Linear(dim, dim)
 
     def forward(
-        self, hidden_states: torch.Tensor, cu_seqlens: torch.Tensor, rotary_pos_emb: torch.Tensor = None
+        self, hidden_states: torch.Tensor, cu_seqlens: torch.Tensor, rotary_pos_emb: torch.Tensor = None, return_attn_weights=False
     ) -> torch.Tensor:
+        
         seq_length = hidden_states.shape[0]
         q, k, v = self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
         q = apply_rotary_pos_emb_vision(q.unsqueeze(0), rotary_pos_emb).squeeze(0)
         k = apply_rotary_pos_emb_vision(k.unsqueeze(0), rotary_pos_emb).squeeze(0)
-
         max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
-        attn_output = flash_attn_varlen_func(q, k, v, cu_seqlens, cu_seqlens, max_seqlen, max_seqlen).reshape(
-            seq_length, -1
-        )
-        attn_output = self.proj(attn_output)
-        return attn_output
-
+        if return_attn_weights:
+            attn_output, attn_weights, _ = flash_attn_varlen_func(q, k, v, cu_seqlens, cu_seqlens, max_seqlen, max_seqlen, return_attn_probs=True)
+            attn_output = attn_output.reshape(
+                seq_length, -1
+            )
+            attn_output = self.proj(attn_output)
+            return attn_output, attn_weights
+        else:
+            attn_output = flash_attn_varlen_func(q, k, v, cu_seqlens, cu_seqlens, max_seqlen, max_seqlen).reshape(
+                seq_length, -1
+            )
+            attn_output = self.proj(attn_output)
+            return attn_output
 
 class VisionSdpaAttention(nn.Module):
     def __init__(self, dim: int, num_heads: int = 16) -> None:
@@ -427,14 +434,73 @@ class Qwen2VLVisionBlock(nn.Module):
         )
         self.mlp = VisionMlp(dim=config.embed_dim, hidden_dim=mlp_hidden_dim, hidden_act=config.hidden_act)
 
-    def forward(self, hidden_states, cu_seqlens, rotary_pos_emb) -> torch.Tensor:
-        hidden_states = hidden_states + self.attn(
-            self.norm1(hidden_states), cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb
-        )
+    def forward(self, hidden_states, cu_seqlens, rotary_pos_emb, perform_self_selection=False, reduce_tokens=0) -> torch.Tensor:
+        if not perform_self_selection:
+            hidden_states = hidden_states + self.attn(
+                self.norm1(hidden_states), cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb
+            )
+        else:
+            if len(cu_seqlens) ==2 : # One image
+                hidden_states_1, attn_weights = self.attn(
+                    self.norm1(hidden_states), cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb, return_attn_weights=True
+                )
+                hidden_states += hidden_states_1
+                attn_weights = [attn_weights]
+            else:  # Multiple images
+                new_hidden_states = []
+                attn_weights = []
+                for i in range(len(cu_seqlens)-1):
+                    tmp_hidden_states, tmp_attn_weights = self.attn(
+                        self.norm1(hidden_states[cu_seqlens[i]:cu_seqlens[i+1]]), cu_seqlens=torch.IntTensor([0, cu_seqlens[i+1] - cu_seqlens[i]]).to(hidden_states.get_device()), rotary_pos_emb=rotary_pos_emb[cu_seqlens[i]:cu_seqlens[i+1]], return_attn_weights=True
+                    )
+                    attn_weights.append(tmp_attn_weights)
+                    new_hidden_states.append(tmp_hidden_states)
+                new_hidden_states = torch.cat(new_hidden_states, 0)
+                hidden_states += new_hidden_states
+                
+        # conduct token merging
+        if perform_self_selection:
+            new_hidden_states = []
+            new_rotary_pos_emb = []
+            new_cu_seqlens = [0]
+            for i in range(len(attn_weights)):  # The number of images
+                # merge the minimum values once
+                image_token_length = attn_weights[i].shape[-1]  # [nheads, seqlen, seqlen] for math attention and [1, nheads, seqlen] for flash_attention-2
+                attn_weights_mean = attn_weights[i].mean(0) 
+                # the tokens to merge
+                if type(reduce_tokens) is float:
+                    reduce_tokens_current = math.floor( reduce_tokens * image_token_length)
+                    if reduce_tokens_current%4 !=0: # for patch merger
+                        if reduce_tokens_current > 4:
+                            reduce_tokens_current = (reduce_tokens_current//4)*4
+                        else:
+                            reduce_tokens_current = 0
+                indice = attn_weights_mean.mean(0).topk(reduce_tokens_current+1, largest=False)[1] # eliminate the heads and get topk
+                # set the starting index of i_th image
+                start_index = cu_seqlens[i] 
+                indice = indice + start_index
+                values = hidden_states[indice]
+                size = torch.arange(reduce_tokens_current+1, 0, -1)  # from keep_tokens+1 to 1
+                # perform merging
+                hidden_states[indice[-1]] = (size.float().to(values.get_device()) @ values.float() / size.float().sum().to(values.get_device())).half()
+                set_all = set(torch.arange(start_index, start_index+image_token_length).tolist())
+                set_excluded = set(indice[:-1].detach().cpu().numpy().tolist())
+                set_selected = set_all - set_excluded
+                set_selected = list(set_selected)
+                set_selected.sort()
+                # update hidden_states of i_th image
+                new_hidden_states.append(hidden_states[set_selected])
+                new_rotary_pos_emb.append(rotary_pos_emb[set_selected])
+                new_cu_seqlens.append(new_cu_seqlens[-1] + image_token_length - reduce_tokens_current)
+            hidden_states = torch.cat(new_hidden_states, 0)
+            rotary_pos_emb = torch.cat(new_rotary_pos_emb, 0)
+            cu_seqlens = torch.IntTensor(new_cu_seqlens).to(hidden_states.get_device())
         hidden_states = hidden_states + self.mlp(self.norm2(hidden_states))
-        return hidden_states
-
-
+        if perform_self_selection:
+            return hidden_states, cu_seqlens, rotary_pos_emb
+        else:
+            return hidden_states
+        
 # Copied from transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm
 class Qwen2RMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
@@ -718,7 +784,19 @@ class Qwen2VLFlashAttention2(Qwen2VLAttention):
         else:
             sliding_window = None
 
-        attn_output = _flash_attention_forward(
+        # attn_output = _flash_attention_forward(
+        #     query_states,
+        #     key_states,
+        #     value_states,
+        #     attention_mask,
+        #     q_len,
+        #     dropout=dropout_rate,
+        #     sliding_window=sliding_window,
+        #     is_causal=self.is_causal,
+        #     use_top_left_mask=self._flash_attn_uses_top_left_mask,
+        # )
+
+        attn_output, attn_weights = _flash_attention_forward_illava(
             query_states,
             key_states,
             value_states,
@@ -728,6 +806,7 @@ class Qwen2VLFlashAttention2(Qwen2VLAttention):
             sliding_window=sliding_window,
             is_causal=self.is_causal,
             use_top_left_mask=self._flash_attn_uses_top_left_mask,
+            return_attn_weights = output_attentions,
         )
 
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size).contiguous()
@@ -1036,7 +1115,7 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
         rotary_pos_emb = rotary_pos_emb_full[pos_ids].flatten(1)
         return rotary_pos_emb
 
-    def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor, illava_config=None) -> torch.Tensor:
         hidden_states = self.patch_embed(hidden_states)
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
@@ -1044,11 +1123,13 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
             dim=0, dtype=torch.int32
         )
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+        for i, blk in enumerate(self.blocks):
+            if illava_config is not None and illava_config["enable_illava_vit"] and i in illava_config["illava_vit_k"]:
+                hidden_states, cu_seqlens, rotary_pos_emb = blk(hidden_states, cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb, perform_self_selection=True, reduce_tokens=illava_config["illava_vit_r"])
+            else:    
+                hidden_states = blk(hidden_states, cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb)
 
-        for blk in self.blocks:
-            hidden_states = blk(hidden_states, cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb)
-
-        return self.merger(hidden_states)
+        return self.merger(hidden_states), cu_seqlens
 
 
 @add_start_docstrings(
@@ -1118,7 +1199,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
             cache_position = torch.arange(
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
             )
-
         # the hard coded `3` is for temporal, height and width.
         if position_ids is None:
             position_ids = cache_position.view(1, 1, -1).expand(3, inputs_embeds.shape[0], -1)
@@ -1157,6 +1237,169 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                 )
             else:
                 layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=causal_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_values,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                )
+
+            hidden_states = layer_outputs[0]
+
+            if use_cache:
+                next_decoder_cache = layer_outputs[2 if output_attentions else 1]
+
+            if output_attentions:
+                all_self_attns += (layer_outputs[1],)
+
+        hidden_states = self.norm(hidden_states)
+
+        # add hidden states from the last decoder layer
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        next_cache = next_decoder_cache if use_cache else None
+
+        if not return_dict:
+            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+        return BaseModelOutputWithPast(
+            last_hidden_state=hidden_states,
+            past_key_values=next_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+        )
+    
+    def forward_illava(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        illava_config = None,
+        vision_start_position = None,
+        vision_end_position = None,
+    ) -> Union[Tuple, BaseModelOutputWithPast]:
+        illava_llm_k = illava_config['illava_llm_k']
+        illava_llm_r = illava_config['illava_llm_r']
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if (input_ids is None) ^ (inputs_embeds is not None):
+            raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+
+        if self.gradient_checkpointing and self.training:
+            if use_cache:
+                logger.warning_once(
+                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                )
+                use_cache = False
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        if cache_position is None:
+            past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
+            cache_position = torch.arange(
+                past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
+            )
+        # the hard coded `3` is for temporal, height and width.
+        if position_ids is None:
+            position_ids = cache_position.view(1, 1, -1).expand(3, inputs_embeds.shape[0], -1)
+        elif position_ids.dim() == 2:
+            position_ids = position_ids[None, ...].expand(3, position_ids.shape[0], -1)
+
+        causal_mask = self._update_causal_mask(
+            attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
+        )
+
+        hidden_states = inputs_embeds
+
+        # create position embeddings to be shared across the decoder layers
+        position_embeddings = self.rotary_emb(hidden_states, position_ids)
+
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions or illava_config != None else None
+        next_decoder_cache = None
+
+        # illava constants
+        seq_length_with_past = past_seen_tokens + inputs_embeds.shape[1]
+        for layer_idx, decoder_layer in enumerate(self.layers):
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+
+            if hidden_states.shape[1] != 1:
+                if layer_idx in illava_llm_k:
+                    # compute pruned tokens, generate illava sign
+                    last_layer_attention = layer_outputs[1]  # [1, nheads, seqlen]
+                    # compute average attention over different head
+                    assert last_layer_attention.shape[0] == 1  # Batch size 1
+                    last_layer_attention_avg_last_tok = torch.mean(last_layer_attention, dim=1)[0]
+                    keep_indexs = [ torch.arange(vision_start_position[0]+1, device='cpu')]
+                    reduce_tokens_all_images = 0
+                    new_vision_start_position = []
+                    new_vision_end_position = []
+                    for i in range(len(vision_start_position)):
+                        # get the attention in image token
+                        last_layer_attention_avg_last_tok_image = last_layer_attention_avg_last_tok[vision_start_position[i]+1:vision_end_position[i]]
+                        image_token_length = int(vision_end_position[i] - vision_start_position[i] - 1)
+                        # get the indexs of the top ATTENTION_RANK tokens
+                        indices = last_layer_attention_avg_last_tok_image.topk(image_token_length).indices
+                        if illava_llm_r>0 and illava_llm_r<1:
+                            r = round(image_token_length*(1-illava_llm_r))
+                        elif illava_llm_r > 1:
+                            r = round(illava_llm_r)
+                        new_vision_start_position.append(vision_start_position[i] - reduce_tokens_all_images)
+                        reduce_tokens_all_images += r
+                        new_vision_end_position.append(vision_end_position[i] - reduce_tokens_all_images)
+
+                        values = hidden_states[0, vision_start_position[i].to(indices.get_device())+1+indices[image_token_length-(r+1):]]
+                        # generate predefined weights
+                        size = torch.arange(1, r+2)  # from r+1 to 1
+                        # merge tokens
+                        hidden_states[0, vision_start_position[i].to(indices.get_device())+1+indices[image_token_length-(r+1)]] = (size.double().to(values.get_device()) @ values.double() / size.double().sum().to(values.get_device())).half()
+                        set_selected = list(indices[:image_token_length-r] + vision_start_position[i].to(indices.get_device())+1)
+                        set_selected.sort()
+                        keep_indexs.append(torch.tensor(set_selected, device='cpu'))
+                    keep_indexs.append(torch.arange(vision_end_position[-1],seq_length_with_past,device='cpu'))
+                    keep_indexs = torch.cat(keep_indexs, 0)
+                    # update seq length
+                    new_seq_length = keep_indexs.shape[0]
+                    # filter hidden states
+                    hidden_states = hidden_states[:,keep_indexs,:] 
+                    # update position embeddings
+                    position_ids = position_ids[:, :, keep_indexs]
+                    position_embeddings = self.rotary_emb(hidden_states, position_ids)
+                    # update attention mask
+                    causal_mask = self._update_causal_mask(
+                            None, hidden_states, 0, None, False
+                        )
+
+                    cache_position = cache_position[:new_seq_length]
+                    vision_start_position = new_vision_start_position
+                    vision_end_position = new_vision_end_position
+                    seq_length_with_past = past_seen_tokens + new_seq_length
+
+            if layer_idx in [tmp -1 for tmp in illava_llm_k]:
+                output_attentions = True
+            else:
+                output_attentions = False
+
+            layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
@@ -1416,13 +1659,14 @@ QWEN2_VL_INPUTS_DOCSTRING = r"""
 class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config):
+    def __init__(self, config, illava_config=None):
         super().__init__(config)
         self.visual = Qwen2VisionTransformerPretrainedModel._from_config(config.vision_config)
         self.model = Qwen2VLModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.padding_side = "left"  # set it to left by default, user can use setter to change padding_sides
+        self.illava_config = illava_config
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1677,18 +1921,54 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         if inputs_embeds is None:
-            inputs_embeds = self.model.embed_tokens(input_ids)
+            inputs_embeds = self.model.embed_tokens(input_ids) 
             if pixel_values is not None:
                 pixel_values = pixel_values.type(self.visual.get_dtype())
-                image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
+                image_embeds, cu_seqlens = self.visual(pixel_values, grid_thw=image_grid_thw, illava_config=self.illava_config)  # [input_len, channels]
                 n_image_tokens = (input_ids == self.config.image_token_id).sum().item()
                 n_image_features = image_embeds.shape[0]
                 if n_image_tokens != n_image_features:
-                    raise ValueError(
-                        f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
-                    )
+                    assert n_image_features < n_image_tokens
+                    assert input_ids.shape[0]==1
+                    vision_start_position = torch.where(input_ids[0] == 151652)[0]  # The starting index of each image, whose number equals num_images
+                    vision_end_position = torch.where(input_ids[0] == 151653)[0]  # The ending index of each image, whose number equals num_images
+                    for tmp in cu_seqlens:
+                        assert tmp%4 ==0
+                    cu_seqlens = cu_seqlens//4  # conduct patch merger
+                    new_input_ids = [ input_ids[:, :vision_start_position[0]]]  # Input tokens until <vision_start>
+                    new_input_embeds = [ inputs_embeds[:, :vision_start_position[0]]] # Input embeds until <vision_start>
+                    new_attention_mask = [ attention_mask[:, :vision_start_position[0]]]
+                    new_position_ids = [ position_ids[:, :, :vision_start_position[0]]]
+                    for i in range(len(vision_start_position)):
+                        new_input_ids.append(
+                            torch.cat( [
+                                input_ids[:, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                input_ids[:, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 1 ))  #[1, input_len]
+                        new_input_embeds.append(
+                            torch.cat( [
+                                inputs_embeds[:, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                inputs_embeds[:, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 1 )) # [1, input_len, channels]
+                        new_attention_mask.append(
+                            torch.cat( [
+                                attention_mask[:, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                attention_mask[:, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 1 )) #[1, input_len]
+                        new_position_ids.append(
+                            torch.cat( [
+                                position_ids[:, :, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                position_ids[:, :, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 2 )) #[3, 1, input_len]
+                    new_input_ids.append(input_ids[:, vision_end_position[-1]+1:])
+                    new_input_embeds.append(inputs_embeds[:, vision_end_position[-1]+1:])
+                    new_attention_mask.append(attention_mask[:, vision_end_position[-1]+1:])
+                    new_position_ids.append(position_ids[:, :, vision_end_position[-1]+1:])
+                    input_ids = torch.cat(new_input_ids, 1)
+                    inputs_embeds = torch.cat(new_input_embeds, 1)
+                    attention_mask = torch.cat(new_attention_mask, 1)
+                    position_ids = torch.cat(new_position_ids, 2)
                 image_mask = (
                     (input_ids == self.config.image_token_id)
                     .unsqueeze(-1)
@@ -1700,13 +1980,50 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
 
             if pixel_values_videos is not None:
                 pixel_values_videos = pixel_values_videos.type(self.visual.get_dtype())
-                video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
+                video_embeds, cu_seqlens = self.visual(pixel_values_videos, grid_thw=video_grid_thw, illava_config=self.illava_config) 
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
                 n_video_features = video_embeds.shape[0]
                 if n_video_tokens != n_video_features:
-                    raise ValueError(
-                        f"Video features and video tokens do not match: tokens: {n_video_tokens}, features {n_video_features}"
-                    )
+                    assert n_video_features < n_video_tokens
+                    assert input_ids.shape[0]==1
+                    vision_start_position = torch.where(input_ids[0] == 151652)[0]  # The starting index of each image, whose number equals num_images
+                    vision_end_position = torch.where(input_ids[0] == 151653)[0]  # The ending index of each image, whose number equals num_images
+                    for tmp in cu_seqlens:
+                        assert tmp%4 ==0
+                    cu_seqlens = cu_seqlens//4  # conduct patch merger
+                    new_input_ids = [ input_ids[:, :vision_start_position[0]]]  # Input tokens until <vision_start>
+                    new_input_embeds = [ inputs_embeds[:, :vision_start_position[0]]] # Input embeds until <vision_start>
+                    new_attention_mask = [ attention_mask[:, :vision_start_position[0]]]
+                    new_position_ids = [ position_ids[:, :, :vision_start_position[0]]]
+                    for i in range(len(vision_start_position)):
+                        new_input_ids.append(
+                            torch.cat( [
+                                input_ids[:, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                input_ids[:, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 1 ))  #[1, input_len]
+                        new_input_embeds.append(
+                            torch.cat( [
+                                inputs_embeds[:, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                inputs_embeds[:, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 1 )) # [1, input_len, channels]
+                        new_attention_mask.append(
+                            torch.cat( [
+                                attention_mask[:, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                attention_mask[:, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 1 )) #[1, input_len]
+                        new_position_ids.append(
+                            torch.cat( [
+                                position_ids[:, :, vision_start_position[i]: vision_start_position[i]+1 + cu_seqlens[i+1] - cu_seqlens[i]], 
+                                position_ids[:, :, vision_end_position[i]:vision_end_position[i]+1] 
+                                ], 2 )) #[3, 1, input_len]
+                    new_input_ids.append(input_ids[:, vision_end_position[-1]+1:])
+                    new_input_embeds.append(inputs_embeds[:, vision_end_position[-1]+1:])
+                    new_attention_mask.append(attention_mask[:, vision_end_position[-1]+1:])
+                    new_position_ids.append(position_ids[:, :, vision_end_position[-1]+1:])
+                    input_ids = torch.cat(new_input_ids, 1)
+                    inputs_embeds = torch.cat(new_input_embeds, 1)
+                    attention_mask = torch.cat(new_attention_mask, 1)
+                    position_ids = torch.cat(new_position_ids, 2)
                 video_mask = (
                     (input_ids == self.config.video_token_id)
                     .unsqueeze(-1)
@@ -1715,21 +2032,39 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 )
                 video_embeds = video_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
                 inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+            vision_start_position = torch.where(input_ids[0] == 151652)[0]  # The starting index of each image, whose number equals num_images
+            vision_end_position = torch.where(input_ids[0] == 151653)[0]  # The ending index of each image, whose number equals num_images
 
             if attention_mask is not None:
                 attention_mask = attention_mask.to(inputs_embeds.device)
 
-        outputs = self.model(
-            input_ids=None,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
+        if self.illava_config is not None and self.illava_config["enable_illava_llm"]:
+                outputs = self.model.forward_illava(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                illava_config = self.illava_config,
+                vision_start_position = vision_start_position,
+                vision_end_position = vision_end_position,
+            )
+        else:
+            outputs = self.model(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
 
         hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)

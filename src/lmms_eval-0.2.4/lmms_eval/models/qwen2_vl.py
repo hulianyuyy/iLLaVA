@@ -191,7 +191,6 @@ class Qwen2_VL(lmms):
                     context = context.replace("<image>", "")
 
                 message = [{"role": "system", "content": "You are a helpful assistant."}]
-
                 if len(visuals) > 0:
                     visual = visuals[i] if i < len(visuals) else None
                     if isinstance(visual, str) and visual.endswith((".mp4", ".avi", ".mov")):  # Video file
