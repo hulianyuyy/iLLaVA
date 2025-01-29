@@ -72,7 +72,7 @@ def run_inference(inputs, input_question):
     Args:
         args: Command-line arguments.
     """
-
+    print(inputs)
     if isinstance(inputs, Image.Image):  # Single-image case
         image_list = []
         image_list.append(inputs)
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     model.eval()
     config = model.config
 
-    def identity(x):
+    def identity(x, y):
         return x
 
     with gr.Blocks(title='iLLaVA') as demo: 
@@ -282,6 +282,6 @@ if __name__ == "__main__":
         image_button.click(run_inference, inputs=[Image_input, Input_question], outputs=image_output)  
         multiple_image_button.click(identity, inputs=[Multi_image_input, Input_question], outputs=multiple_image_show)
         multiple_image_button.click(run_inference, inputs=[Multi_image_input, Input_question], outputs=multiple_image_output)
-        video_button.click(run_inference, inputs=Video_input, outputs=video_output)
+        video_button.click(run_inference, inputs=[Video_input, Input_question], outputs=video_output)
         
     demo.launch(share=True,server_name="0.0.0.0", server_port=7862)
