@@ -38,7 +38,7 @@ def is_image_by_extension(file_path):
 
     return file_extension.lower() in image_extensions
 
-def run_inference(inputs, input_question, processor):
+def run_inference(inputs, input_question):
     """
     Run inference on one input sample.
 
@@ -46,24 +46,13 @@ def run_inference(inputs, input_question, processor):
         args: Command-line arguments.
     """
 
-    input_question = ' '.join(args.question.split('_'))
-    if is_image_by_extension(args.input_path):  # single-image case
+    input_question = ' '.join(input_question.split('_'))
+
+    if type(inputs)==list: # Multi-image case
         # Messages containing multiple images and a text query
         messages = [
             {
-                #'role': 'system', 'content': "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": ensure_image_url(args.input_path), "min_pixels":args.min_pixels, "max_pixels":args.max_pixels},
-                    {"type": "text", "text": input_question},
-                ],
-            }
-        ]
-    elif os.path.isdir(args.input_path): # Multi-image case
-        # Messages containing multiple images and a text query
-        messages = [
-            {
-                #'role': 'system', 'content': "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+                'role': 'system', 'content': "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n",
                 "role": "user",
                 "content": [
                     {"type": "text", "text": input_question},
@@ -71,13 +60,26 @@ def run_inference(inputs, input_question, processor):
             }
         ]
 
-        for x in os.listdir(args.input_path):
+        for x in inputs:
             if is_image_by_extension(x):
-                messages['content'].append(
-                    {"type": "image", "image": ensure_image_url(os.path.join(args.input_path, x)), "min_pixels":args.min_pixels, "max_pixels":args.max_pixels}
+                messages[0]['content'].append(
+                    {"type": "image", "image": ensure_image_url(x)}
                     )
+        print(messages)
+    elif is_image_by_extension(inputs):  # single-image case
+        # Messages containing an image and a text query
+        messages = [
+            {
+                #'role': 'system', 'content': "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": ensure_image_url(inputs), "min_pixels":args.min_pixels, "max_pixels":args.max_pixels},
+                    {"type": "text", "text": input_question},
+                ],
+            }
+        ]
 
-    elif os.path.splitext(args.input_path)[-1] in VIDEO_FORMATS: # video case
+    elif os.path.splitext(inputs)[-1] in VIDEO_FORMATS: # video case
         messages = [
             {
                 #'role': 'system', 'content': "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
@@ -85,7 +87,7 @@ def run_inference(inputs, input_question, processor):
                 "content": [
                     {
                         "type": "video",
-                        "video": ensure_video_url(args.input_path),
+                        "video": ensure_video_url(inputs),
                         # "max_pixels": 360 * 420,
                         "nframes": args.max_frames_num,
                     },
@@ -132,7 +134,7 @@ def parse_args():
     # Params for iLLaVA
     parser.add_argument("--enable_illava_vit", type=bool, default=False)
     parser.add_argument("--illava_vit_k", type=str, default=None)   # Input with format like '2-3' denoting layers 2 and 3
-    parser.add_argument("--illava_vit_r", type=int, default=0)
+    parser.add_argument("--illava_vit_r", type=float, default=0)
     parser.add_argument("--enable_illava_llm", type=bool, default=False)
     parser.add_argument("--illava_llm_k", type=str, default=None)   # Input with format like '2-3' denoting layers 2 and 3
     parser.add_argument("--illava_llm_r", type=float, default=0)
@@ -147,7 +149,6 @@ if __name__ == "__main__":
     # Load tokenizer, model and image processor
     model_path = os.path.expanduser(args.model_path)
 
-    mm_spatial_pool_stride = args.mm_spatial_pool_stride
     if args.illava_llm_k==None:
         pass
     elif isinstance(args.illava_llm_k, str):
@@ -184,7 +185,7 @@ if __name__ == "__main__":
     # default processer
     processor = Qwen2VLProcessor.from_pretrained(model_path, min_pixels=args.min_pixels, max_pixels=args.max_pixels)
 
-    def identity(x):
+    def identity(x, y):
         return x
 
     with gr.Blocks(title='iLLaVA') as demo: 
@@ -193,7 +194,7 @@ if __name__ == "__main__":
         with gr.Tab('Image'):
             with gr.Row():
                 with gr.Column(scale=1):
-                    Image_input = gr.Image(type="pil",label="Upload an image file")
+                    Image_input = gr.Image(type="filepath",label="Upload an image file")
                     Input_question = gr.Textbox(label="Prompt", placeholder="Describe the input in detail.", lines=2)
                     image_button = gr.Button("Run")  
                 with gr.Column(scale=1):
@@ -215,9 +216,9 @@ if __name__ == "__main__":
                     video_button = gr.Button("Run")  
                 with gr.Column(scale=1):
                     video_output = gr.Textbox(label="Output")
-        image_button.click(run_inference, inputs=[Image_input, Input_question, processor], outputs=image_output)  
+        image_button.click(run_inference, inputs=[Image_input, Input_question], outputs=image_output)  
         multiple_image_button.click(identity, inputs=[Multi_image_input, Input_question], outputs=multiple_image_show)
-        multiple_image_button.click(run_inference, inputs=[Multi_image_input, Input_question, processor], outputs=multiple_image_output)
-        video_button.click(run_inference, inputs=[Video_input, Input_question, processor], outputs=video_output)
+        multiple_image_button.click(run_inference, inputs=[Multi_image_input, Input_question], outputs=multiple_image_output)
+        video_button.click(run_inference, inputs=[Video_input, Input_question], outputs=video_output)
         
-    demo.launch(share=True,server_name="0.0.0.0", server_port=7862)
+    demo.launch(share=False,server_name="0.0.0.0", server_port=7862)

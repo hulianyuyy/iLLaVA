@@ -1350,14 +1350,19 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     # compute average attention over different head
                     assert last_layer_attention.shape[0] == 1  # Batch size 1
                     last_layer_attention_avg_last_tok = torch.mean(last_layer_attention, dim=1)[0]
-                    keep_indexs = [ torch.arange(vision_start_position[0]+1, device='cpu')]
+                    keep_indexs = [ torch.arange(vision_start_position[0], device='cpu')]
                     reduce_tokens_all_images = 0
                     new_vision_start_position = []
                     new_vision_end_position = []
+                    print(f"vision_start_position:{vision_start_position}")
+                    print(f"vision_end_position:{vision_end_position}")
+                    print(f"last_layer_attention_avg_last_tok:{last_layer_attention_avg_last_tok.shape}")
                     for i in range(len(vision_start_position)):
                         # get the attention in image token
                         last_layer_attention_avg_last_tok_image = last_layer_attention_avg_last_tok[vision_start_position[i]+1:vision_end_position[i]]
                         image_token_length = int(vision_end_position[i] - vision_start_position[i] - 1)
+                        print(f"last_layer_attention_avg_last_tok_image:{last_layer_attention_avg_last_tok_image.shape}")
+                        print(f"image_token_length:{image_token_length}")
                         # get the indexs of the top ATTENTION_RANK tokens
                         indices = last_layer_attention_avg_last_tok_image.topk(image_token_length).indices
                         if illava_llm_r>0 and illava_llm_r<1:
@@ -1375,8 +1380,14 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                         hidden_states[0, vision_start_position[i].to(indices.get_device())+1+indices[image_token_length-(r+1)]] = (size.double().to(values.get_device()) @ values.double() / size.double().sum().to(values.get_device())).half()
                         set_selected = list(indices[:image_token_length-r] + vision_start_position[i].to(indices.get_device())+1)
                         set_selected.sort()
+                        print(f"r:{r}")
+                        print(f"len of set_selected: {len(set_selected)}")
+                        keep_indexs.append(torch.tensor([int(vision_start_position[i])], device='cpu'))
                         keep_indexs.append(torch.tensor(set_selected, device='cpu'))
-                    keep_indexs.append(torch.arange(vision_end_position[-1],seq_length_with_past,device='cpu'))
+                        keep_indexs.append(torch.tensor([int(vision_end_position[i])], device='cpu'))
+                    keep_indexs.append(torch.arange(vision_end_position[-1]+1,seq_length_with_past,device='cpu'))
+                    print(f"keep_indexs[-1]:{keep_indexs[-1]}")
+                    print(f"seq_length_with_past:{seq_length_with_past}")
                     keep_indexs = torch.cat(keep_indexs, 0)
                     # update seq length
                     new_seq_length = keep_indexs.shape[0]
