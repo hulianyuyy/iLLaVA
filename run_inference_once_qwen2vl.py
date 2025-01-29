@@ -119,7 +119,7 @@ def run_inference(args):
 
         for x in os.listdir(args.input_path):
             if is_image_by_extension(x):
-                messages['content'].append(
+                messages[0]['content'].append(
                     {"type": "image", "image": ensure_image_url(os.path.join(args.input_path, x)), "min_pixels":args.min_pixels, "max_pixels":args.max_pixels}
                     )
 
