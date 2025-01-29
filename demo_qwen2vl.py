@@ -221,4 +221,4 @@ if __name__ == "__main__":
         multiple_image_button.click(run_inference, inputs=[Multi_image_input, Input_question], outputs=multiple_image_output)
         video_button.click(run_inference, inputs=[Video_input, Input_question], outputs=video_output)
         
-    demo.launch(share=False,server_name="0.0.0.0", server_port=7862)
+    demo.launch(share=True,server_name="0.0.0.0", server_port=7862)

@@ -178,6 +178,7 @@ The command is shown as follows:
 
 `python demo_qwen2vl.py  --enable_illava_vit True --illava_vit_k 12-13-14-15 --illava_vit_r 0.16  --enable_illava_llm True --illava_llm_k 6-7-8 --illava_llm_r 0.90 --model_path /path_to_your_checkpoint` 
 
+After running the command, you can visit `http://0.0.0.0:7862` to play with the demo. You can also change it into an public URL by setting `share=True` in the last line in `demo.py` or `demo_qwen2vl.py`.
 
 Below is the visualization for our demo.
 
