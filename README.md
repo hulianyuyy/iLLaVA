@@ -4,6 +4,7 @@
 <a href="https://arxiv.org/pdf/2412.06263">
 <img alt="Static Badge" src="https://img.shields.io/badge/arXiv-2412.06263-red"></a>
 
+(**Lastet code to be updated in about one week, thanks for watching!**)
 
 _**iLLaVA** is an efficient method for large vision language models by merging visual tokens. It could achieve about **2×** throughput and **1.7× - 2×** memory reduction with comparable performance through merging redundant visual tokens in some certain layers._
 
