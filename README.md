@@ -6,7 +6,7 @@
 
 _**iLLaVA** is an efficient two-stage efficient method by recursively merging visual tokens within both the vision encoder and LLM for large vision language models. It could achieve about **2×** throughput and **1.7× - 2×** memory reduction with comparable performance through merging redundant visual tokens in some certain layers._
 
-https://github.com/user-attachments/assets/86940bcb-2eb8-4cac-97b3-ac9d1aa6c28f
+https://github.com/user-attachments/assets/62da6e0b-5787-4ecf-bf40-2d114df7b04c
 
 <div align=center>
 
@@ -14,7 +14,7 @@ https://github.com/user-attachments/assets/86940bcb-2eb8-4cac-97b3-ac9d1aa6c28f
 </div>
 
 <div align=center>
-<img width="800" src="./figs/framework.png"/>
+<img width="800" src="figs/framework.png"/>
 <h4> Fig.1: The framework of iLLaVA</h4>
 </div>
 
@@ -42,7 +42,7 @@ https://github.com/user-attachments/assets/86940bcb-2eb8-4cac-97b3-ac9d1aa6c28f
 4. - [x] Demo
 5. - [x] Support Qwen3-VL, Qwen2-VL and LLaVA-Onevision
 
-The main branch now supports Qwen3-VL. For Qwen2-VL and LLaVA-Onevision, please refers to the `Qwen2vl_LLaVAonevision` branch.
+The main branch now supports **Qwen3-VL**. For **Qwen2-VL and LLaVA-Onevision**, please refers to the `Qwen2vl_LLaVAonevision` branch.
 
 ## 🧨Setup
 ```bash
@@ -56,7 +56,7 @@ bash setup.sh
 ## 🎈Inference
 This repo provides the inference code for iLLaVA, implemented based on [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL). 
 
-We use [VLMEvalKit](https://github.com/open-compass/VLMEvalKit) to conduct inference with Qwen3-VL. The pretrained weights of Qwen3-VL could be **automatically** downloaded during inference. You can also manually download the pretrained weight for Qwen3-VL (e.g., Qwen3-VL 8B) from [here](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct), or conducting the following command to download it:
+We use [VLMEvalKit](https://github.com/open-compass/VLMEvalKit) to conduct inference with Qwen3-VL. The pretrained weights of Qwen3-VL could be **automatically** downloaded during inference. You can also manually download the pretrained weight for Qwen3-VL (e.g., Qwen3-VL 8B) [here](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct), or conducting the following command to download it:
 
 ```
 pip install -U huggingface_hub
@@ -80,9 +80,9 @@ If you are using multiple gpus for evaluation, you can run the following command
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc-per-node=4 run.py --data your_benchmark --model Qwen3-VL-8B-Instruct-iLLaVA --verbose --reuse
 ```
 
-Set the `your_benchmark` as your target benchmark. The representative benchmarks include: MMMU_DEV_VAL (MMMU benchmark), MME (MME benchmark), MMStar (MMStar benchmark), MMBench_DEV_EN (MMBench benchmark), MMBench_DEV_EN_V11 (MMBench V1.1), MMVet (MMVet benchmark), AI2D_TEST (AI2D benchmark), ScienceQA_TEST (ScienceQA benchmark), MUIRBench (MuirBench benchmark), RealWorldQA (RealWorldQA benchmark), Video-MME_128frame_subs (VideoMME benchmark). Other tasks supported by VLMEvalKit can be found in [supported tasks](https://aicarrier.feishu.cn/wiki/Qp7wwSzQ9iK1Y6kNUJVcr6zTnPe?table=tblsdEpLieDoCxtb&view=vewa8sGZrY).
+Set the `your_benchmark` as your target benchmark. The representative benchmarks include: MMMU_DEV_VAL (MMMU benchmark), MME (MME benchmark), MMStar (MMStar benchmark), MMBench_DEV_EN (MMBench benchmark), MMBench_DEV_EN_V11 (MMBench V1.1), MMVet (MMVet benchmark), AI2D_TEST (AI2D benchmark), ScienceQA_TEST (ScienceQA benchmark), MUIRBench (MuirBench benchmark), RealWorldQA (RealWorldQA benchmark), Video-MME_1fps (VideoMME benchmark). Other tasks supported by VLMEvalKit can be found in [supported tasks](https://aicarrier.feishu.cn/wiki/Qp7wwSzQ9iK1Y6kNUJVcr6zTnPe?table=tblsdEpLieDoCxtb&view=vewa8sGZrY).
 
-The detailed args of iLLaVA for Qwen3-VL are defined in [config.py](src/VLMEvalKit/vlmeval/config.py)
+The detailed args of iLLaVA for Qwen3-VL are defined in [config.py](https://github.com/hulianyuyy/iLLaVA/src/VLMEvalKit/vlmeval/config.py)
 
 If you are difficult to visit `https://huggingface.co/` (e.g., in *China*), place `HF_ENDPOINT=https://hf-mirror.com` in the beginning of your command.
 
@@ -136,18 +136,18 @@ Besides the original paramters of LLaVA-Onevision, we introduce several new para
 
 - `enable_illava_vit[bool]`, whether enables using iLLaVA in the ViT stage. `Default: True`.
 - `illava_vit_k[str]`, the layers to merge tokens in the ViT stage. For example, `5-6-7-8` indicates layers [5,6,7,8]. `Default: 5-6-7-8`.
-- `illava_vit_r[float]`, the ratio of tokens preserved in each layer of the ViT stage.  `Default: 0.90`.
+- `illava_vit_r[float]`, the ratio of tokens preserved in each layer of the ViT stage.  `Default: 0.85`.
 - `illava_vit_mode[int]`, the mode of perform token merging in the ViT, 1=drop lowest, 2=shift-merge, 3=cluster Pv^i/Pv^c, `Default: 3`.
 - `enable_illava_llm[bool]`, whether enables using iLLaVA in the LLM stage. `Default: True`.
-- `illava_llm_k[str]`, the layers to merge tokens in the LLM stage. For example, `15-17-19-21` indicates layers [15,17,19,21]. `Default: 15-17-19-21`.
-- `illava_llm_r[float]`, the ratio of tokens preserved in each layer of the LLM stage.  `Default: 0.85`.
+- `illava_llm_k[str]`, the layers to merge tokens in the LLM stage. For example, `19-21-23-25` indicates layers [19,21,23,25]. `Default: 19-21-23-25`.
+- `illava_llm_r[float]`, the ratio of tokens preserved in each layer of the LLM stage.  `Default: 0.9`.
 - `illava_llm_mode[int]`, the mode of perform token merging in the LLM, 1=drop lowest, 2=shift-merge, 3=cluster Pv^i/Pv^c, `Default: 3`.
 
 You can set the corresponding parameters in the `model_args` of the command like we provide in the `inference` section.
 
 ## 🛒Model inplementation 
 We mainly modify the following files to conduct different functions:
-- [model.py](./src/VLMEvalKit/vlmeval/vlm/qwen3_vl/model.py), which defines the Qwen3 model and builds prompts.
+- [model.py](src/VLMEvalKit/vlmeval/vlm/qwen3_vl/model.py), which defines the Qwen3 model and builds prompts.
 - [modeling_qwen3_vl.py](src/transformers-4.57.4/src/transformers/models/qwen3_vl/modeling_qwen3_vl.py), which implements the forward pass of image encoder and LLM.
 ## 🎁Acknowledgements
 
