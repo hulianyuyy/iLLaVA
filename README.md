@@ -1,4 +1,4 @@
-<h1 align="center">iLLaVA</h1>
+<h1 align="center">iLLaVA (ICLR2026)</h1>
 
 <p align="center">
 <a href="https://arxiv.org/pdf/2412.06263">
