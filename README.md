@@ -82,7 +82,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc-per-node=4 run.py --data your_benc
 
 Set the `your_benchmark` as your target benchmark. The representative benchmarks include: MMMU_DEV_VAL (MMMU benchmark), MME (MME benchmark), MMStar (MMStar benchmark), MMBench_DEV_EN (MMBench benchmark), MMBench_DEV_EN_V11 (MMBench V1.1), MMVet (MMVet benchmark), AI2D_TEST (AI2D benchmark), ScienceQA_TEST (ScienceQA benchmark), MUIRBench (MuirBench benchmark), RealWorldQA (RealWorldQA benchmark), Video-MME_1fps (VideoMME benchmark). Other tasks supported by VLMEvalKit can be found in [supported tasks](https://aicarrier.feishu.cn/wiki/Qp7wwSzQ9iK1Y6kNUJVcr6zTnPe?table=tblsdEpLieDoCxtb&view=vewa8sGZrY).
 
-The detailed args of iLLaVA for Qwen3-VL are defined in [config.py](https://github.com/hulianyuyy/iLLaVA/src/VLMEvalKit/vlmeval/config.py)
+The detailed args of iLLaVA for Qwen3-VL are defined in [config.py](VLMEvalKit/vlmeval/config.py)
 
 If you are difficult to visit `https://huggingface.co/` (e.g., in *China*), place `HF_ENDPOINT=https://hf-mirror.com` in the beginning of your command.
 
