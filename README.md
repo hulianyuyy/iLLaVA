@@ -147,8 +147,8 @@ You can set the corresponding parameters in the `model_args` of the command like
 
 ## 🛒Model inplementation 
 We mainly modify the following files to conduct different functions:
-- [model.py](src/VLMEvalKit/vlmeval/vlm/qwen3_vl/model.py), which defines the Qwen3 model and builds prompts.
-- [modeling_qwen3_vl.py](src/transformers-4.57.4/src/transformers/models/qwen3_vl/modeling_qwen3_vl.py), which implements the forward pass of image encoder and LLM.
+- [model.py](VLMEvalKit/vlmeval/vlm/qwen3_vl/model.py), which defines the Qwen3 model and builds prompts.
+- [modeling_qwen3_vl.py](transformers-4.57.4/src/transformers/models/qwen3_vl/modeling_qwen3_vl.py), which implements the forward pass of image encoder and LLM.
 ## 🎁Acknowledgements
 
 Thanks to [FastV](https://github.com/pkunlp-icler/FastV), [FreeVideoLLM](https://github.com/contrastive/FreeVideoLLM) for their open-source code.
