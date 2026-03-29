@@ -1287,7 +1287,7 @@ qwen3vl_series = {
         illava_vit_r=0.85, # the ratio of preserved visual tokens in each ViT block
         illava_vit_mode=3, # 1=drop lowest, 2=shift-merge, 3=cluster Pv^i/Pv^c
         enable_illava_llm=True,  # whether performing token reduction on llm side based on illava_llm_k and illava_llm_r
-        illava_llm_k="19-21-23-25", #the layers of LLM-based token reduction,"19-21-23-25", for 66.7% visual token reduction, "21-23-25", for 88.9% visual token reduction, 
+        illava_llm_k="21-23-25", #the layers of LLM-based token reduction,"19-21-23-25", for 66.7% visual token reduction, "21-23-25", for 88.9% visual token reduction, 
         illava_llm_r=0.7, # the ratio of preserved visual tokens in each LLM block, 0.9 for 66.7% visual token reduction, 0.7 for 88.9% visual token reduction,  
         illava_llm_mode=3, # 1=drop lowest, 2=shift-merge, 3=cluster Pv^i/Pv^c
         # illava_pc_ratio=0.10, # the ratio of P^c tokens
